@@ -5,9 +5,6 @@ import { validateRequest } from '../middlewares/validateRequest';
 
 const router = Router();
 
-/**
- * Esquema de validación para el payload de churn usando Zod
- */
 const churnRequestSchema = z.object({
   adulto_mayor: z.number().int().min(0).max(1),
   meses_como_cliente: z.number().int().min(0),
@@ -20,24 +17,16 @@ const churnRequestSchema = z.object({
   proteccion_dispositivo: z.enum(['Yes', 'No', 'No internet service']),
   soporte_tecnico: z.enum(['Yes', 'No', 'No internet service']),
   tipo_contrato: z.string().min(1),
-  facturacion_electronica: z.enum(['Yes', 'No']),
+  facturacion_electronica:  z.enum(['Yes', 'No']),
   metodo_pago: z.string().min(1),
 });
 
-/**
- * Ruta: POST /api/churn/knn
- * Descripción: Predice churn usando modelo KNN simulado
- */
 router.post(
   '/knn',
   validateRequest(churnRequestSchema),
   predictChurnKnn
 );
 
-/**
- * Ruta: POST /api/churn/logreg
- * Descripción: Predice churn usando modelo de Regresión Logística simulado
- */
 router.post(
   '/logreg',
   validateRequest(churnRequestSchema),

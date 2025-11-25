@@ -1,4 +1,11 @@
-import { CreditCardRequest, KMeansResponse, ClusterDetails } from '../models/types';
+// services/CreditKmeansService.ts
+
+import {
+  CreditCardRequest,
+  KMeansResponse,
+  ClusterDetails,
+  SegmentacionCliente,
+} from '../models/types';
 import { OnnxModelLoader } from '../utils/onnxLoader';
 import { preprocessCreditData, createTensor } from '../utils/preprocessing';
 import { config } from '../config/env';
@@ -6,67 +13,97 @@ import * as ort from 'onnxruntime-node';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Servicio que usa un modelo K-Means ONNX para segmentación de clientes de tarjeta de crédito
- * Si el modelo ONNX no está disponible, usa simulación como fallback
- */
 export class CreditKmeansService {
   private modelSession: ort.InferenceSession | null = null;
   private modelPath: string;
   private useOnnx: boolean = false;
 
-  // Mapeo de clusters a descripciones (para cuando usamos ONNX)
-  private clusterDescriptions: Map<number, { descripcion: string; detalles: ClusterDetails }> = new Map([
-    [0, {
-      descripcion: 'Cliente premium con excelente comportamiento de pago y uso responsable del crédito.',
-      detalles: {
-        riesgo: 'bajo',
-        tipo_cliente: 'premium',
-        recomendacion: 'Ofrecer aumento de límite y beneficios exclusivos.',
-      }
-    }],
-    [1, {
-      descripcion: 'Cliente rotativo estable con balance medio y pagos regulares.',
-      detalles: {
-        riesgo: 'medio',
-        tipo_cliente: 'rotativo_estable',
-        recomendacion: 'Mantener comunicación activa y ofrecer programas de lealtad.',
-      }
-    }],
-    [2, {
-      descripcion: 'Cliente con balance medio, uso moderado y ligera dependencia de adelantos.',
-      detalles: {
-        riesgo: 'medio',
-        tipo_cliente: 'rotativo',
-        recomendacion: 'Ofrecer plan de consolidación de deuda.',
-      }
-    }],
-    [3, {
-      descripcion: 'Cliente con balance alto, pagos mínimos y bajo uso del crédito.',
-      detalles: {
-        riesgo: 'alto',
-        tipo_cliente: 'alto_riesgo',
-        recomendacion: 'Implementar estrategia de recuperación y reestructuración de deuda.',
-      }
-    }],
-    [4, {
-      descripcion: 'Cliente inactivo o nuevo con bajo uso del crédito.',
-      detalles: {
-        riesgo: 'bajo',
-        tipo_cliente: 'inactivo',
-        recomendacion: 'Campaña de activación y ofertas promocionales.',
-      }
-    }],
+  private clusterDescriptions: Map<
+    number,
+    {
+      nombre_segmento: string;
+      descripcion: string;
+      detalles: ClusterDetails;
+    }
+  > = new Map([
+    [
+      0,
+      {
+        nombre_segmento: 'Usuarios en Riesgo por Avances',
+        descripcion:
+          'Clientes que usan la tarjeta principalmente como fuente de efectivo: muchos avances, alto saldo y pagos mínimos elevados. Muestran señales claras de estrés financiero.',
+        detalles: {
+          riesgo: 'alto',
+          tipo_cliente: 'dependiente_avances',
+          recomendacion:
+            'Implementar campañas de educación financiera, ofrecer refinanciación o consolidación de deuda, reducir el acceso a avances y activar alertas tempranas.',
+        },
+      },
+    ],
+    [
+      1,
+      {
+        nombre_segmento: 'Compradores Moderados y Disciplinados',
+        descripcion:
+          'Clientes ordenados, con compras totales moderadas, alta frecuencia de compras y casi sin avances. Mantienen saldos bajos y pagan de forma responsable.',
+        detalles: {
+          riesgo: 'bajo',
+          tipo_cliente: 'moderado_responsable',
+          recomendacion:
+            'Ofrecer aumentos moderados de límite, programas de fidelización/cashback y productos premium de entrada.',
+        },
+      },
+    ],
+    [
+      2,
+      {
+        nombre_segmento: 'Grandes Compradores (High Spenders Premium)',
+        descripcion:
+          'Clientes VIP con las compras más altas del portafolio, tanto al contado como en cuotas. Tienen límites elevados, pagan montos altos y prácticamente no usan avances.',
+        detalles: {
+          riesgo: 'bajo',
+          tipo_cliente: 'premium_vip',
+          recomendacion:
+            'Ofrecer tarjetas gold/platinum, beneficios exclusivos (viajes, seguros, lounges), aumentos proactivos de límite y programas de lealtad premium.',
+        },
+      },
+    ],
+    [
+      3,
+      {
+        nombre_segmento: 'Compradores Frecuentes de Ticket Medio',
+        descripcion:
+          'Clientes que usan mucho la tarjeta con frecuencia alta de compras y montos de ticket medio, principalmente al contado. Son muy rentables y casi no usan avances.',
+        detalles: {
+          riesgo: 'bajo',
+          tipo_cliente: 'frecuente_rentable',
+          recomendacion:
+            'Ofrecer promociones por transacción, financiamiento a cuotas y mejores beneficios de cashback para reforzar su uso.',
+        },
+      },
+    ],
+    [
+      4,
+      {
+        nombre_segmento: 'Clientes Inactivos o de Bajo Uso',
+        descripcion:
+          'Clientes con compras totales muy bajas, poca frecuencia de uso y sin avances. Pueden ser nuevos o poco interesados en la tarjeta.',
+        detalles: {
+          riesgo: 'bajo',
+          tipo_cliente: 'inactivo_bajo_uso',
+          recomendacion:
+            'Lanzar campañas de activación, beneficios por primeras compras y promociones de 0% interés para incentivar el uso.',
+        },
+      },
+    ],
   ]);
+
 
   constructor() {
     this.modelPath = config.models.creditKmeans;
     this.initializeModel();
   }
 
-  /**
-   * Inicializa el modelo ONNX si está disponible
-   */
   private async initializeModel(): Promise<void> {
     try {
       const absolutePath = path.isAbsolute(this.modelPath)
@@ -76,191 +113,144 @@ export class CreditKmeansService {
       if (fs.existsSync(absolutePath)) {
         this.modelSession = await OnnxModelLoader.loadModel(absolutePath);
         this.useOnnx = true;
-        console.log('✅ Usando modelo ONNX para Credit K-Means');
+        console.log('Usando modelo ONNX para Credit K-Means');
       } else {
         console.warn(
-          `⚠️  Modelo ONNX no encontrado en ${absolutePath}. Usando simulación.`
+          `Modelo ONNX no encontrado en ${absolutePath}. Usando simulación.`
         );
         this.useOnnx = false;
       }
-    } catch (error) {
-      console.error('Error al cargar modelo ONNX para Credit K-Means:', error);
+    } catch (err) {
+      console.error('Error inicializando modelo ONNX:', err);
       this.useOnnx = false;
     }
   }
 
-  /**
-   * Asigna un cliente a un cluster usando modelo ONNX o simulación
-   * @param request - Datos del cliente de tarjeta de crédito
-   * @returns Cluster asignado con descripción y detalles
-   */
   async predict(request: CreditCardRequest): Promise<KMeansResponse> {
-    // Intentar usar modelo ONNX si está disponible
     if (this.useOnnx && this.modelSession) {
       try {
         return await this.predictWithOnnx(request);
-      } catch (error) {
-        console.error('Error en predicción ONNX, usando fallback:', error);
-        if (config.useFallback) {
-          return this.predictSimulated(request);
-        }
-        throw error;
+      } catch (err) {
+        console.error('Error en predicción ONNX:', err);
+        if (config.useFallback) return this.predictSimulated(request);
+        throw new Error('Error en predicción ONNX');
       }
     }
 
-    // Usar simulación como fallback
-    if (config.useFallback) {
-      return this.predictSimulated(request);
-    }
-
+    if (config.useFallback) return this.predictSimulated(request);
     throw new Error('Modelo ONNX no disponible y fallback deshabilitado');
   }
 
-  /**
-   * Predicción usando modelo ONNX real
-   */
-  private async predictWithOnnx(request: CreditCardRequest): Promise<KMeansResponse> {
-    if (!this.modelSession) {
-      throw new Error('Modelo ONNX no inicializado');
+  // Helper para construir objeto de segmentación
+  private buildSegmentacion(cluster: number): SegmentacionCliente {
+    const info = this.clusterDescriptions.get(cluster);
+
+    if (!info) {
+      return {
+        cluster,
+        nombre_segmento: `Segmento ${cluster}`,
+        descripcion: `Cliente asignado al cluster ${cluster}.`,
+        detalles: {
+          riesgo: 'medio',
+          tipo_cliente: 'estándar',
+          recomendacion: 'Monitoreo regular y ofertas personalizadas.',
+        },
+      };
     }
 
-    // Preprocesar datos
-    const features = preprocessCreditData(request);
-    
-    // Crear tensor de entrada
-    const inputTensor = createTensor(features, [1, features.length]);
-
-    // Obtener el nombre del input del modelo
-    const inputName = this.modelSession.inputNames[0];
-
-    // Ejecutar inferencia
-    const feeds = { [inputName]: inputTensor };
-    const results = await this.modelSession.run(feeds);
-
-    // Obtener la salida del modelo (cluster asignado)
-    const outputName = this.modelSession.outputNames[0];
-    const output = results[outputName];
-
-    // Extraer el cluster predicho
-    const outputData = output.data as Float32Array;
-    const cluster = Math.round(outputData[0]); // K-Means devuelve el índice del cluster
-
-    // Obtener descripción del cluster
-    const clusterInfo = this.clusterDescriptions.get(cluster) || {
-      descripcion: `Cliente asignado al cluster ${cluster}.`,
-      detalles: {
-        riesgo: 'medio' as const,
-        tipo_cliente: 'estándar',
-        recomendacion: 'Monitoreo regular y ofertas personalizadas según comportamiento.',
-      }
-    };
-
     return {
-      model: 'kmeans',
       cluster,
-      descripcion: clusterInfo.descripcion,
-      detalles_cluster: clusterInfo.detalles,
+      nombre_segmento: info.nombre_segmento,
+      descripcion: info.descripcion,
+      detalles: info.detalles,
     };
   }
 
-  /**
-   * Predicción usando simulación (fallback)
-   */
-  private predictSimulated(request: CreditCardRequest): KMeansResponse {
-    const {
-      BALANCE,
-      PURCHASES_FREQUENCY,
-      CASH_ADVANCE,
-      PAYMENTS,
-      MINIMUM_PAYMENTS,
-      PRC_FULL_PAYMENT,
-      CREDIT_LIMIT,
-    } = request;
+  private async predictWithOnnx(
+    request: CreditCardRequest
+  ): Promise<KMeansResponse> {
+    if (!this.modelSession) throw new Error('Modelo ONNX no inicializado');
+    console.log('Prediciendo con modelo ONNX...');
+    const features = preprocessCreditData(request);
+    const inputTensor = createTensor(features, [1, features.length]);
+    const inputName = this.modelSession.inputNames[0];
 
-    // Calcular ratios importantes
-    const balanceRatio = BALANCE / CREDIT_LIMIT;
-    const paymentRatio = PAYMENTS / (BALANCE || 1);
-    const cashAdvanceRatio = CASH_ADVANCE / (BALANCE || 1);
+    const results = await this.modelSession.run({ [inputName]: inputTensor });
+    const output = results[this.modelSession.outputNames[0]].data as any;
 
-    // Asignar cluster basado en reglas
-    let cluster: number;
-    let descripcion: string;
-    let detalles_cluster: ClusterDetails;
+    const raw = output[0];
+    const cluster =
+      typeof raw === 'bigint' ? Number(raw) : Math.round(Number(raw));
 
-    if (
-      balanceRatio < 0.3 &&
-      PURCHASES_FREQUENCY > 0.6 &&
-      PRC_FULL_PAYMENT > 0.5 &&
-      cashAdvanceRatio < 0.1
-    ) {
-      cluster = 0;
-      descripcion = 'Cliente premium con excelente comportamiento de pago y uso responsable del crédito.';
-      detalles_cluster = {
-        riesgo: 'bajo',
-        tipo_cliente: 'premium',
-        recomendacion: 'Ofrecer aumento de límite y beneficios exclusivos.',
-      };
-    } else if (
-      balanceRatio >= 0.3 &&
-      balanceRatio < 0.7 &&
-      paymentRatio > 0.5 &&
-      PURCHASES_FREQUENCY > 0.3 &&
-      cashAdvanceRatio < 0.3
-    ) {
-      cluster = 1;
-      descripcion = 'Cliente rotativo estable con balance medio y pagos regulares.';
-      detalles_cluster = {
-        riesgo: 'medio',
-        tipo_cliente: 'rotativo_estable',
-        recomendacion: 'Mantener comunicación activa y ofrecer programas de lealtad.',
-      };
-    } else if (
-      cashAdvanceRatio > 0.4 ||
-      (balanceRatio > 0.6 && CASH_ADVANCE > BALANCE * 0.3)
-    ) {
-      cluster = 2;
-      descripcion = 'Cliente con balance medio, uso moderado y ligera dependencia de adelantos.';
-      detalles_cluster = {
-        riesgo: 'medio',
-        tipo_cliente: 'rotativo',
-        recomendacion: 'Ofrecer plan de consolidación de deuda.',
-      };
-    } else if (
-      balanceRatio > 0.7 &&
-      paymentRatio < 0.3 &&
-      PRC_FULL_PAYMENT < 0.2 &&
-      PURCHASES_FREQUENCY < 0.3
-    ) {
-      cluster = 3;
-      descripcion = 'Cliente con balance alto, pagos mínimos y bajo uso del crédito.';
-      detalles_cluster = {
-        riesgo: 'alto',
-        tipo_cliente: 'alto_riesgo',
-        recomendacion: 'Implementar estrategia de recuperación y reestructuración de deuda.',
-      };
-    } else if (PURCHASES_FREQUENCY < 0.2 && balanceRatio < 0.2) {
-      cluster = 4;
-      descripcion = 'Cliente inactivo o nuevo con bajo uso del crédito.';
-      detalles_cluster = {
-        riesgo: 'bajo',
-        tipo_cliente: 'inactivo',
-        recomendacion: 'Campaña de activación y ofertas promocionales.',
-      };
-    } else {
-      cluster = 1;
-      descripcion = 'Cliente estándar con comportamiento típico de uso de tarjeta de crédito.';
-      detalles_cluster = {
-        riesgo: 'medio',
-        tipo_cliente: 'estándar',
-        recomendacion: 'Monitoreo regular y ofertas personalizadas según comportamiento.',
-      };
-    }
+    const segmentacion = this.buildSegmentacion(cluster);
 
     return {
       model: 'kmeans',
       cluster,
-      descripcion,
-      detalles_cluster,
+      segmentacion,
+      // Si quieres mandar también las features al front:
+      // features_normalizadas: this.buildFeaturesDict(features)
+    };
+  }
+
+  private predictSimulated(request: CreditCardRequest): KMeansResponse {
+    const {
+      Saldo,
+      Frecuencia_Compras,
+      Avances_Efectivo,
+      Pagos_Realizados,
+      Pago_Minimo,
+      Pct_Pago_Completo,
+      Limite_Credito,
+    } = request;
+
+    const balanceRatio = Saldo / (Limite_Credito || 1);
+    const paymentRatio = Pagos_Realizados / (Saldo || 1);
+    const cashAdvanceRatio = Avances_Efectivo / (Saldo || 1);
+
+    let cluster = 1;
+
+    if (
+      balanceRatio < 0.3 &&
+      Frecuencia_Compras > 0.6 &&
+      Pct_Pago_Completo > 0.5 &&
+      cashAdvanceRatio < 0.1
+    ) {
+      // Premium
+      cluster = 0;
+    } else if (
+      balanceRatio < 0.7 &&
+      paymentRatio > 0.5 &&
+      Frecuencia_Compras > 0.3 &&
+      cashAdvanceRatio < 0.3
+    ) {
+      // Rotativo estable
+      cluster = 1;
+    } else if (
+      cashAdvanceRatio > 0.4 ||
+      (balanceRatio > 0.6 && Avances_Efectivo > Saldo * 0.3)
+    ) {
+      // Dependencia de adelantos
+      cluster = 2;
+    } else if (
+      balanceRatio > 0.7 &&
+      paymentRatio < 0.3 &&
+      Pct_Pago_Completo < 0.2 &&
+      Frecuencia_Compras < 0.3
+    ) {
+      // Alto riesgo
+      cluster = 3;
+    } else if (Frecuencia_Compras < 0.2 && balanceRatio < 0.2) {
+      // Inactivo
+      cluster = 4;
+    }
+
+    const segmentacion = this.buildSegmentacion(cluster);
+
+    return {
+      model: 'kmeans',
+      cluster,
+      segmentacion,
     };
   }
 }

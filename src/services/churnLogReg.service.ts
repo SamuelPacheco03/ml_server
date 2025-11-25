@@ -64,7 +64,6 @@ export class ChurnLogRegService {
     const probNoAbandono = probs[0];
     const probAbandono = probs[1];
 
-    // ✅ probabilidad = confianza de la clase predicha
     let probabilidadClase = prediccion === 1 ? probAbandono : probNoAbandono;
     probabilidadClase = Math.min(1, Math.max(0, probabilidadClase));
 
@@ -108,7 +107,6 @@ export class ChurnLogRegService {
     const pAb = Math.min(0.99, Math.max(0.01, pAbandono));
     const prediccion: 0 | 1 = pAb >= 0.5 ? 1 : 0;
 
-    // misma lógica: probabilidadClase = confianza de la predicción
     const probabilidadClase = prediccion === 1 ? pAb : 1 - pAb;
 
     return {
@@ -121,14 +119,12 @@ export class ChurnLogRegService {
 
   private generateMessage(prediccion: 0 | 1, probabilidadClase: number): string {
     if (prediccion === 1) {
-      // clase 1 = abandona → probabilidadClase = prob_abandono
       if (probabilidadClase >= 0.7) {
         return 'El cliente tiene alta probabilidad de abandonar el servicio.';
       }
       return 'El cliente tiene probabilidad moderada de abandonar el servicio.';
     }
 
-    // clase 0 = no abandona → probabilidadClase = prob_no_abandono
     const probAbandono = 1 - probabilidadClase;
 
     if (probAbandono <= 0.3) {

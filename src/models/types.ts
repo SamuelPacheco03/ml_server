@@ -27,8 +27,8 @@ export interface ChurnRequest {
  */
 export interface ChurnResponse {
   model: 'knn' | 'logistic_regression';
-  prediccion: 0 | 1; // 0 = no abandona, 1 = abandona
-  probabilidad: number; // valor entre 0 y 1
+  prediccion: 0 | 1;
+  probabilidad: number;
   mensaje: string;
 }
 
@@ -36,23 +36,42 @@ export interface ChurnResponse {
  * Payload para segmentación de clientes de tarjeta de crédito (K-Means)
  */
 export interface CreditCardRequest {
-  BALANCE: number;
-  PURCHASES_FREQUENCY: number;
-  CASH_ADVANCE: number;
-  PAYMENTS: number;
-  MINIMUM_PAYMENTS: number;
-  PRC_FULL_PAYMENT: number;
-  CREDIT_LIMIT: number;
+  Saldo: number;
+  Frecuencia_Saldo: number;
+  Compras_Totales: number;
+  Compras_Contado: number;
+  Compras_Cuotas: number;
+  Avances_Efectivo: number;
+  Frecuencia_Compras: number;
+  Frec_Compras_Contado: number;
+  Frec_Compras_Cuotas: number;
+  Frec_Avances: number;
+  Transacciones_Avance: number;
+  Transacciones_Compra: number;
+  Limite_Credito: number;
+  Pagos_Realizados: number;
+  Pago_Minimo: number;
+  Pct_Pago_Completo: number;
 }
+
+export type RiesgoNivel = 'bajo' | 'medio' | 'alto';
 
 /**
  * Detalles de un cluster
  */
 export interface ClusterDetails {
-  riesgo: 'bajo' | 'medio' | 'alto';
+  riesgo: RiesgoNivel;
   tipo_cliente: string;
   recomendacion: string;
 }
+
+export interface SegmentacionCliente {
+  cluster: number;
+  nombre_segmento: string;
+  descripcion: string;
+  detalles: ClusterDetails;
+}
+
 
 /**
  * Respuesta de segmentación K-Means
@@ -60,8 +79,8 @@ export interface ClusterDetails {
 export interface KMeansResponse {
   model: 'kmeans';
   cluster: number;
-  descripcion: string;
-  detalles_cluster: ClusterDetails;
+  segmentacion: SegmentacionCliente;
+  features_normalizadas?: Record<string, number>;
 }
 
 /**

@@ -19,13 +19,10 @@ export const predictChurnKnn = async (
   try {
     const requestData: ChurnRequest = req.body;
 
-    // Llamar al servicio KNN
     const prediction = await churnKnnService.predict(requestData);
 
-    // Devolver respuesta exitosa
     res.status(200).json(prediction);
   } catch (error) {
-    // Pasar el error al middleware de manejo de errores
     next(error);
   }
 };
@@ -42,13 +39,10 @@ export const predictChurnLogReg = async (
   try {
     const requestData: ChurnRequest = req.body;
 
-    // Llamar al servicio de Regresión Logística
     const prediction = await churnLogRegService.predict(requestData);
 
-    // Devolver respuesta exitosa
     res.status(200).json(prediction);
   } catch (error) {
-    // Pasar el error al middleware de manejo de errores
     next(error);
   }
 };

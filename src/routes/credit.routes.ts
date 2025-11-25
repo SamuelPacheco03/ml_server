@@ -5,23 +5,25 @@ import { validateRequest } from '../middlewares/validateRequest';
 
 const router = Router();
 
-/**
- * Esquema de validación para el payload de tarjeta de crédito usando Zod
- */
 const creditCardRequestSchema = z.object({
-  BALANCE: z.number().min(0),
-  PURCHASES_FREQUENCY: z.number().min(0).max(1),
-  CASH_ADVANCE: z.number().min(0),
-  PAYMENTS: z.number().min(0),
-  MINIMUM_PAYMENTS: z.number().min(0),
-  PRC_FULL_PAYMENT: z.number().min(0).max(1),
-  CREDIT_LIMIT: z.number().min(0),
+  Saldo: z.number().min(0),
+  Frecuencia_Saldo: z.number().min(0),
+  Compras_Totales: z.number().min(0),
+  Compras_Contado: z.number().min(0),
+  Compras_Cuotas: z.number().min(0),
+  Avances_Efectivo: z.number().min(0),
+  Frecuencia_Compras: z.number().min(0),
+  Frec_Compras_Contado: z.number().min(0),
+  Frec_Compras_Cuotas: z.number().min(0),
+  Frec_Avances: z.number().min(0),
+  Transacciones_Avance: z.number().min(0),
+  Transacciones_Compra: z.number().min(0),
+  Limite_Credito: z.number().min(0),
+  Pagos_Realizados: z.number().min(0),
+  Pago_Minimo: z.number().min(0),
+  Pct_Pago_Completo: z.number().min(0).max(1),
 });
 
-/**
- * Ruta: POST /api/credit/kmeans
- * Descripción: Segmenta cliente de tarjeta de crédito usando K-Means simulado
- */
 router.post(
   '/kmeans',
   validateRequest(creditCardRequestSchema),

@@ -10,13 +10,13 @@ const startServer = (): void => {
   const port = config.port;
 
   app.listen(port, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
-    console.log(`📊 Endpoints disponibles:`);
+    console.log(`Servidor corriendo en http://localhost:${port}`);
+    console.log(`Endpoints disponibles:`);
     console.log(`   - GET  /health`);
     console.log(`   - POST /api/churn/knn`);
     console.log(`   - POST /api/churn/logreg`);
     console.log(`   - POST /api/credit/kmeans`);
-    console.log(`🌍 CORS habilitado para: ${config.corsOrigin}`);
+    console.log(`CORS habilitado para: ${config.corsOrigin}`);
   });
 };
 
