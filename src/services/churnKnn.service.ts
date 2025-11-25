@@ -78,7 +78,6 @@ export class ChurnKnnService {
     const probNoAbandono = probs[0];
     const probAbandono = probs[1];
 
-    // ✅ probabilidad = confianza de la clase predicha
     let probabilidadClase = prediccion === 1 ? probAbandono : probNoAbandono;
     probabilidadClase = Math.min(1, Math.max(0, probabilidadClase));
 

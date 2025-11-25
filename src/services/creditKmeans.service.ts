@@ -188,8 +188,6 @@ export class CreditKmeansService {
       model: 'kmeans',
       cluster,
       segmentacion,
-      // Si quieres mandar también las features al front:
-      // features_normalizadas: this.buildFeaturesDict(features)
     };
   }
 
